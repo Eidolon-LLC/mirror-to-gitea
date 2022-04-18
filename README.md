@@ -33,6 +33,7 @@ docker container run \
  -d \
  --restart always \
  -e GITHUB_USERNAME=github-user \
+ -e GITHUB_TOKEN=github-token-for-user \
  -e GITEA_URL=https://some-gitea.url \
  -e GITEA_TOKEN=please-exchange-with-token \
  jaedle/mirror-to-gitea:latest

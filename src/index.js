@@ -7,7 +7,7 @@ async function getGithubRepositories(username, token) {
   const octokit = new Octokit({
     auth: token || null,
   });
-  return octokit.paginate('GET /users/:username/repos', { username: username })
+  return octokit.paginate('GET /user/repos')
     .then(repositories => toRepositoryList(repositories));
 }
 
@@ -35,15 +35,25 @@ function isAlreadyMirroredOnGitea(repository, gitea, giteaUser) {
     .catch(() => false);
 }
 
-function mirrorOnGitea(repository, gitea, giteaUser) {
-  request.post(`${gitea.url}/api/v1/repos/migrate`)
-    .query(`access_token=${gitea.token}`)
-    .send({
-      clone_addr: repository.url,
-      mirror: true,
-      repo_name: repository.name,
-      uid: giteaUser.id,
-    })
+function mirrorOnGitea(repository, gitea, giteaUser, github) {
+  var url = `${gitea.url}/api/v1/repos/migrate`
+  var query = `access_token=${gitea.token}`
+  var post = {
+    auth_username: github.username,
+    auth_token: github.token,
+    clone_addr: repository.url,
+    mirror: true,
+    lfs: true,
+    private: true,
+    pull_requests: true,
+    releases: true,
+    repo_name: repository.name,
+    uid: giteaUser.id,
+  }
+
+  request.post(url)
+    .query(query)
+    .send(post)
     .then(() => {
       console.log('Did it!');
     })
@@ -53,7 +63,7 @@ function mirrorOnGitea(repository, gitea, giteaUser) {
 
 }
 
-async function mirror(repository, gitea, giteaUser) {
+async function mirror(repository, gitea, giteaUser, github) {
   if (await isAlreadyMirroredOnGitea(repository.name,
     gitea,
     giteaUser)) {
@@ -61,7 +71,7 @@ async function mirror(repository, gitea, giteaUser) {
     return;
   }
   console.log('Mirroring repository to gitea: ', repository.name);
-  await mirrorOnGitea(repository, gitea, giteaUser);
+  await mirrorOnGitea(repository, gitea, giteaUser, github);
 }
 
 async function main() {
@@ -76,6 +86,11 @@ async function main() {
     console.error('No GITEA_URL specified, please specify! Exiting..');
     return;
   }
+
+  const github = {
+    username: githubUsername,
+    token: githubToken,
+  };
 
   const giteaToken = process.env.GITEA_TOKEN;
   if (!giteaToken) {
@@ -96,7 +111,7 @@ async function main() {
   const queue = new PQueue({ concurrency: 4 });
   await queue.addAll(githubRepositories.map(repository => {
     return async () => {
-      await mirror(repository, gitea, giteaUser);
+      await mirror(repository, gitea, giteaUser, github);
     };
   }));
 }
