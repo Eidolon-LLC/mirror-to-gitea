@@ -7,3 +7,4 @@ node_modules/
 
 
 run-local.sh
+publish-docker.sh
